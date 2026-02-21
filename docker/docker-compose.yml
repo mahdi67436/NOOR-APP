@@ -1,0 +1,70 @@
+# NoorGuard Ultimate - Docker Compose
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: noorguard-postgres
+    environment:
+      POSTGRES_USER: noorguard
+      POSTGRES_PASSWORD: noorguard2024
+      POSTGRES_DB: noorguard_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - noorguard-network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: noorguard-redis
+    command: redis-server --requirepass noorguard2024
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - noorguard-network
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: noorguard-backend
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://noorguard:noorguard2024@postgres:5432/noorguard_db
+      - REDIS_URL=redis://:noorguard2024@redis:6379/0
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - noorguard-network
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ../web-dashboard
+      dockerfile: Dockerfile
+    container_name: noorguard-web
+    environment:
+      - NEXT_PUBLIC_API_URL=http://backend:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - noorguard-network
+    restart: unless-stopped
+
+networks:
+  noorguard-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
